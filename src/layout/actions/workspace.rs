@@ -1,5 +1,7 @@
 use petgraph::graph::NodeIndex;
 use uuid::Uuid;
+
+use rustwlc::{Point, Geometry, Size, ResizeEdge};
 use super::super::LayoutTree;
 use super::super::core::container::{Container, ContainerType};
 use ::debug_enabled;
@@ -82,6 +84,14 @@ impl LayoutTree {
         }
         // Get the new workspace, or create one if it doesn't work
         let mut workspace_ix = self.get_or_make_workspace(name);
+
+        {
+            let workspace = &self.tree[workspace_ix];
+            if let Some(geom) = workspace.get_geometry() {
+                trace!("Workspace, {}, geometry {}", workspace.name(), geom);
+            }
+        }
+
         if old_worksp_ix == workspace_ix {
             return;
         }
@@ -143,10 +153,33 @@ impl LayoutTree {
                 };
             }
         }
+
+
+        &self.make_workspace_big(workspace_ix);
+
         trace!("Focusing on next container");
         self.focus_on_next_container(workspace_ix);
         self.validate();
         self.validate_path();
+
+        {
+            let workspace = &self.tree[workspace_ix];
+            if let Some(geom) = workspace.get_geometry() {
+                trace!("Workspace, {}, geometry {}", workspace.name(), geom);
+            }
+        }
+    }
+
+    pub fn make_workspace_big(&mut self, workspace_ix: NodeIndex) {
+        let workspace = &mut self.tree[workspace_ix];
+        let geom = Geometry {
+            origin: Point { x: -1000, y:0 },
+            size: Size { w: 4000, h: 700 }
+        };
+        workspace.set_geometry(ResizeEdge::empty(), geom);
+        if let Some(geom) = workspace.get_geometry() {
+            trace!("Workspace, {}, geometry {}", workspace.name(), geom);
+        }
     }
 
     /// Moves the active container to a new workspace.

@@ -43,6 +43,8 @@ pub enum ContainerErr {
     BadOperationOn(ContainerType, &'static str)
 }
 
+// Coordinate systems based on parent:
+// Root -> Output -> Workspace -> Container -> Container -> VieW
 impl ContainerType {
     /// Whether this container can be used as the parent of another
     pub fn can_have_child(self, other: ContainerType) -> bool {

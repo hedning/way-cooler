@@ -54,7 +54,11 @@ impl LayoutTree {
                 let output_geometry = self.tree[output_ix].get_geometry()
                     .expect("Could not get output geometry");
                 let mut fullscreen_apps = Vec::new();
-                self.layout_helper(node_ix, output_geometry, &mut fullscreen_apps);
+                if let Some(geom) = self.tree[node_ix].get_geometry() {
+                    self.layout_helper(node_ix, geom, &mut fullscreen_apps);
+                } else {
+                    self.layout_helper(node_ix, output_geometry, &mut fullscreen_apps);
+                }
                 self.layout_fullscreen_apps(fullscreen_apps)
             }
             ContainerType::Container => {
@@ -151,10 +155,10 @@ impl LayoutTree {
                             let remaining_size_f = |sub_geometry: Geometry,
                                                     cur_geometry: Geometry| {
                                 let remaining_width =
-                                    cur_geometry.origin.x as u32 + cur_geometry.size.w -
-                                    sub_geometry.origin.x as u32;
+                                    cur_geometry.origin.x + cur_geometry.size.w as i32 -
+                                    sub_geometry.origin.x;
                                 Size {
-                                    w: remaining_width,
+                                    w: remaining_width as u32,
                                     h: sub_geometry.size.h
                                 }
                             };
