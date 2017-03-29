@@ -124,6 +124,59 @@ impl LayoutTree {
                     _ => unreachable!()
                 };
                 match layout {
+                    Layout::Scroll => {
+                        let children = self.tree.grounded_children(node_ix);
+                        let children_len = children.len();
+                        let width = LayoutTree::calculate_scale(children.iter().map(|child_ix| {
+                            let c_geometry = self.tree[*child_ix].get_geometry()
+                                .expect("Child had no geometry");
+                            c_geometry.size.w as f32
+                        }).collect(), geometry.size.w as f32);
+
+                        if width > 0.1 {
+
+                            let default_width = 500 as u32;
+                            // Updated geometry with enough width to hold all children
+                            let new_geometry = Geometry {
+                                origin: geometry.origin.clone(),
+                                size: Size {
+                                    w: default_width*children_len as u32,
+                                    h: geometry.size.h.clone()
+                                }
+                            };
+                            let new_size_f = |child_size: Size, sub_geometry: Geometry| {
+                                Size {
+                                    w: default_width,
+                                    h: sub_geometry.size.h
+                                }
+                            };
+                            let remaining_size_f = |sub_geometry: Geometry,
+                                                    cur_geometry: Geometry| {
+                                let remaining_width =
+                                    cur_geometry.origin.x + cur_geometry.size.w as i32 -
+                                    sub_geometry.origin.x;
+                                Size {
+                                    w: remaining_width as u32,
+                                    h: sub_geometry.size.h
+                                }
+                            };
+                            let new_point_f = |new_size: Size, sub_geometry: Geometry| {
+                                Point {
+                                    x: sub_geometry.origin.x + new_size.w as i32,
+                                    y: sub_geometry.origin.y
+                                }
+                            };
+                            self.tree[node_ix].set_geometry(ResizeEdge::empty(), new_geometry);
+                            self.generic_tile(node_ix, new_geometry, children.as_slice(),
+                                              new_size_f, remaining_size_f, new_point_f,
+                                              fullscreen_apps);
+                            self.add_borders(node_ix)
+                                .expect("Couldn't add border gaps to horizontal container");
+                            self.add_gaps(node_ix)
+                                .expect("Couldn't add gaps to horizontal container");
+                            self.draw_borders_rec(children);
+                        }
+                    }
                     Layout::Horizontal => {
                         let children = self.tree.grounded_children(node_ix);
                         let children_len = children.len();
@@ -576,7 +629,7 @@ impl LayoutTree {
                 match self.tree[parent_ix] {
                     Container::Container { ref layout, .. } => {
                         match *layout {
-                            Layout::Horizontal => {
+                            Layout::Horizontal | Layout::Scroll => {
                                 new_geometry = Geometry {
                                     origin: parent_geometry.origin.clone(),
                                     size: Size {
@@ -677,7 +730,7 @@ impl LayoutTree {
                     geometry.origin.y += (gap / 2) as i32;
                     if index == children.len() - 1 {
                         match layout {
-                            Layout::Horizontal => {
+                            Layout::Horizontal | Layout::Scroll => {
                                 geometry.size.w = geometry.size.w.saturating_sub(gap / 2)
                             },
                             Layout::Vertical => {
@@ -686,7 +739,7 @@ impl LayoutTree {
                         }
                     }
                     match layout {
-                        Layout::Horizontal => {
+                        Layout::Horizontal | Layout::Scroll => {
                             geometry.size.w = geometry.size.w.saturating_sub(gap / 2);
                             geometry.size.h = geometry.size.h.saturating_sub(gap);
                         },
