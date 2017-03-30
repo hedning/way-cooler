@@ -289,6 +289,73 @@ impl LayoutTree {
         self.validate();
     }
 
+    // If a View, inside a container with Scroll layout, is outside the display
+    // move the container so that the view is fully visible.
+    pub fn scroll_into_view(&mut self, node_ix: NodeIndex) {
+        let parent_ix = self.tree.parent_of(node_ix)
+            .expect("Node had no parent");
+        let geometry_p;
+        let layout_p;
+        { // get the geometry and layout of parent_ix
+            let parent_c = &self.tree[parent_ix];
+            geometry_p = parent_c.get_geometry()
+                .expect("Had no geometry");
+            match *parent_c {
+                Container::Container { layout, .. } => {
+                    layout_p = layout;
+                }
+                // Do nothing if parent doesn't have a layout
+                _ => return
+            }
+
+        }
+        match layout_p {
+            Layout::Scroll => {
+                let resolution;
+                let geometry_c;
+                {
+                    let node_c =  &self.tree[node_ix];
+                    geometry_c = node_c.get_geometry()
+                        .expect("Had no geometry");
+                    match *node_c {
+                        Container::View { handle, .. } => {
+                            resolution = handle.get_output().get_resolution()
+                                .expect("Output had no resolution");
+                        }
+                        _ => return
+                    }
+                }
+                let x = geometry_c.origin.x;
+                let new_geometry;
+                if x < 0 {
+                    new_geometry = Geometry {
+                        origin: Point {
+                            x: geometry_p.origin.x - x,
+                            y: geometry_p.origin.y
+                        },
+                        size: geometry_p.size.clone()
+                    };
+                    let mut fullscreen_apps = Vec::new();
+                    self.layout_helper(parent_ix, new_geometry, &mut fullscreen_apps);
+                // x >= 0 so as u32 is safe
+                } else if x as u32 + geometry_c.size.w > resolution.w {
+                    new_geometry = Geometry {
+                        origin: Point {
+                            x: geometry_p.origin.x - x
+                                + (resolution.w as i32 - geometry_c.size.w as i32),
+                            y: geometry_p.origin.y
+                        },
+                        size: geometry_p.size.clone()
+                    };
+                    let mut fullscreen_apps = Vec::new();
+                    self.layout_helper(parent_ix, new_geometry, &mut fullscreen_apps);
+                }
+
+            }
+            _ => {}
+        }
+    }
+
     /// Attempts to set the node behind the id to be floating.
     ///
     /// This removes the container from its parent and makes its new parent-
