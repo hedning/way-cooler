@@ -311,6 +311,17 @@ impl LayoutTree {
         }
         match layout_p {
             Layout::Scroll => {
+                // How much of the prev/next container should be visible
+                let overlap = {
+                    let children = self.tree.grounded_children(parent_ix);
+                    if children.len() > 0 && (children[0] == node_ix
+                         || children[children.len() - 1] == node_ix) {
+                            0 /* Don't show the background (showing the background
+                                 incidentially seem to cause some rendering bugs) */
+                        } else {
+                            25
+                        }
+                };
                 let resolution;
                 let geometry_c;
                 {
@@ -330,7 +341,7 @@ impl LayoutTree {
                 if x < 0 {
                     new_geometry = Geometry {
                         origin: Point {
-                            x: geometry_p.origin.x - x,
+                            x: geometry_p.origin.x - x + overlap,
                             y: geometry_p.origin.y
                         },
                         size: geometry_p.size.clone()
@@ -341,7 +352,7 @@ impl LayoutTree {
                 } else if x as u32 + geometry_c.size.w > resolution.w {
                     new_geometry = Geometry {
                         origin: Point {
-                            x: geometry_p.origin.x - x
+                            x: geometry_p.origin.x - x - overlap
                                 + (resolution.w as i32 - geometry_c.size.w as i32),
                             y: geometry_p.origin.y
                         },
