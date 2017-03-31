@@ -337,27 +337,15 @@ impl LayoutTree {
                     }
                 }
                 let x = geometry_c.origin.x;
-                let new_geometry;
+                let mut new_geometry = geometry_p.clone();
                 if x < 0 {
-                    new_geometry = Geometry {
-                        origin: Point {
-                            x: geometry_p.origin.x - x + overlap,
-                            y: geometry_p.origin.y
-                        },
-                        size: geometry_p.size.clone()
-                    };
+                    new_geometry.origin.x = geometry_p.origin.x - x + overlap;
                     let mut fullscreen_apps = Vec::new();
                     self.layout_helper(parent_ix, new_geometry, &mut fullscreen_apps);
                 // x >= 0 so as u32 is safe
                 } else if x as u32 + geometry_c.size.w > resolution.w {
-                    new_geometry = Geometry {
-                        origin: Point {
-                            x: geometry_p.origin.x - x - overlap
-                                + (resolution.w as i32 - geometry_c.size.w as i32),
-                            y: geometry_p.origin.y
-                        },
-                        size: geometry_p.size.clone()
-                    };
+                    new_geometry.origin.x = geometry_p.origin.x - x - overlap
+                        + (resolution.w as i32 - geometry_c.size.w as i32);
                     let mut fullscreen_apps = Vec::new();
                     self.layout_helper(parent_ix, new_geometry, &mut fullscreen_apps);
                 }
