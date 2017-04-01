@@ -118,29 +118,35 @@ impl LayoutTree {
                     Layout::Scroll => {
                         let children = self.tree.grounded_children(node_ix);
                         let children_len = children.len();
-                        let width = LayoutTree::calculate_scale(children.iter().map(|child_ix| {
+                        let total_width = LayoutTree::calculate_scale(children.iter().map(|child_ix| {
                             let c_geometry = self.tree[*child_ix].get_geometry()
                                 .expect("Child had no geometry");
                             c_geometry.size.w as f32
                         }).collect(), geometry.size.w as f32);
 
-                        if width > 0.1 {
+                        if total_width > 0.1 {
 
-                            let default_width = 500 as u32;
                             // Updated geometry with enough width to hold all children
                             let new_geometry = Geometry {
                                 origin: self.tree[node_ix].get_geometry()
                                     .expect("Container had no geometry").origin.clone(),
                                 size: Size {
-                                    w: default_width*children_len as u32,
-                                    h: geometry.size.h.clone()
+                                    w: total_width as u32,
+                                    h: geometry.size.h
                                 }
                             };
                             self.tree[node_ix].set_geometry(ResizeEdge::empty(), new_geometry);
 
                             let new_size_f = |child_size: Size, sub_geometry: Geometry| {
+                                let width = if child_size.w > 0 {
+                                    child_size.w as f32
+                                } else {
+                                    // If the width would become zero, just make it the average size of the container.
+                                    // e.g, if container was width 500 w/ 2 children, this view would have a width of 250
+                                    geometry.size.w as f32 / children_len.checked_sub(1).unwrap_or(1) as f32
+                                };
                                 Size {
-                                    w: default_width,
+                                    w: width as u32,
                                     h: sub_geometry.size.h
                                 }
                             };
@@ -714,7 +720,18 @@ impl LayoutTree {
                 match self.tree[parent_ix] {
                     Container::Container { ref layout, .. } => {
                         match *layout {
-                            Layout::Horizontal | Layout::Scroll => {
+                            Layout::Scroll => {
+                                let size = self.tree[node_ix].get_geometry()
+                                    .expect("View had no geometry").size;
+                                new_geometry = Geometry {
+                                    origin: parent_geometry.origin.clone(),
+                                    size: Size {
+                                        w: size.w,
+                                        h: parent_geometry.size.h
+                                    }
+                                };
+                            }
+                            Layout::Horizontal => {
                                 new_geometry = Geometry {
                                     origin: parent_geometry.origin.clone(),
                                     size: Size {
