@@ -110,15 +110,6 @@ impl LayoutTree {
                 }
             },
             ContainerType::Container => {
-                {
-                    let container_mut = self.tree.get_mut(node_ix).unwrap();
-                    match *container_mut {
-                        Container::Container { geometry: ref mut c_geometry, .. } => {
-                            *c_geometry = geometry;
-                        },
-                        _ => unreachable!()
-                    };
-                }
                 let layout = match self.tree[node_ix] {
                     Container::Container { layout, .. } => layout,
                     _ => unreachable!()
@@ -138,12 +129,15 @@ impl LayoutTree {
                             let default_width = 500 as u32;
                             // Updated geometry with enough width to hold all children
                             let new_geometry = Geometry {
-                                origin: geometry.origin.clone(),
+                                origin: self.tree[node_ix].get_geometry()
+                                    .expect("Container had no geometry").origin.clone(),
                                 size: Size {
                                     w: default_width*children_len as u32,
                                     h: geometry.size.h.clone()
                                 }
                             };
+                            self.tree[node_ix].set_geometry(ResizeEdge::empty(), new_geometry);
+
                             let new_size_f = |child_size: Size, sub_geometry: Geometry| {
                                 Size {
                                     w: default_width,
@@ -166,7 +160,6 @@ impl LayoutTree {
                                     y: sub_geometry.origin.y
                                 }
                             };
-                            self.tree[node_ix].set_geometry(ResizeEdge::empty(), new_geometry);
                             self.generic_tile(node_ix, new_geometry, children.as_slice(),
                                               new_size_f, remaining_size_f, new_point_f,
                                               fullscreen_apps);
@@ -178,6 +171,15 @@ impl LayoutTree {
                         }
                     }
                     Layout::Horizontal => {
+                        {
+                            let container_mut = self.tree.get_mut(node_ix).unwrap();
+                            match *container_mut {
+                                Container::Container { geometry: ref mut c_geometry, .. } => {
+                                    *c_geometry = geometry;
+                                },
+                                _ => unreachable!()
+                            };
+                        }
                         let children = self.tree.grounded_children(node_ix);
                         let children_len = children.len();
                         let mut scale = LayoutTree::calculate_scale(children.iter().map(|child_ix| {
@@ -228,6 +230,15 @@ impl LayoutTree {
                         }
                     }
                     Layout::Vertical => {
+                        {
+                            let container_mut = self.tree.get_mut(node_ix).unwrap();
+                            match *container_mut {
+                                Container::Container { geometry: ref mut c_geometry, .. } => {
+                                    *c_geometry = geometry;
+                                },
+                                _ => unreachable!()
+                            };
+                        }
                         let children = self.tree.grounded_children(node_ix);
                         let children_len = children.len();
                         let mut scale = LayoutTree::calculate_scale(children.iter().map(|child_ix| {
@@ -341,11 +352,17 @@ impl LayoutTree {
                 if x < 0 {
                     new_geometry.origin.x = geometry_p.origin.x - x + overlap;
                     let mut fullscreen_apps = Vec::new();
+                    {
+                        self.tree[parent_ix].set_geometry(ResizeEdge::empty(), new_geometry);
+                    }
                     self.layout_helper(parent_ix, new_geometry, &mut fullscreen_apps);
                 // x >= 0 so as u32 is safe
                 } else if x as u32 + geometry_c.size.w > resolution.w {
                     new_geometry.origin.x = geometry_p.origin.x - x - overlap
                         + (resolution.w as i32 - geometry_c.size.w as i32);
+                    {
+                        self.tree[parent_ix].set_geometry(ResizeEdge::empty(), new_geometry);
+                    }
                     let mut fullscreen_apps = Vec::new();
                     self.layout_helper(parent_ix, new_geometry, &mut fullscreen_apps);
                 }
