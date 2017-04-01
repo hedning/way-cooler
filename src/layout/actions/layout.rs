@@ -339,13 +339,14 @@ impl LayoutTree {
                     let node_c =  &self.tree[node_ix];
                     geometry_c = node_c.get_geometry()
                         .expect("Had no geometry");
-                    match *node_c {
-                        Container::View { handle, .. } => {
-                            resolution = handle.get_output().get_resolution()
-                                .expect("Output had no resolution");
-                        }
+                    let output_ix = self.tree.ancestor_of_type(node_ix, ContainerType::Output)
+                                         .expect("Node had no output parent");
+                    resolution = match self.tree[output_ix] {
+                        Container::Output { handle, .. } => {
+                            handle.get_resolution().expect("Output had no resolution")
+                        },
                         _ => return
-                    }
+                    };
                 }
                 let x = geometry_c.origin.x;
                 let mut new_geometry = geometry_p.clone();
@@ -368,7 +369,8 @@ impl LayoutTree {
                 }
 
             }
-            _ => {}
+            // Try to scroll the parent into view
+            _ => { &self.scroll_into_view(parent_ix); }
         }
     }
 
