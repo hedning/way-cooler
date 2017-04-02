@@ -101,7 +101,19 @@ impl LayoutTree {
             ContainerType::Workspace => {
                 self.tree[node_ix].set_geometry(ResizeEdge::empty(), geometry);
                 for child_ix in self.tree.grounded_children(node_ix) {
-                    self.layout_helper(child_ix, geometry, fullscreen_apps);
+                    match self.tree[node_ix] {
+                        Container::Container { layout, geometry: geometry_c, ..} => {
+                            match layout {
+                                Layout::Scroll => {
+                                    let mut constraint_geometry = geometry_c.clone();
+                                    constraint_geometry.size.h = geometry.size.h;
+                                    self.layout_helper(child_ix, constraint_geometry, fullscreen_apps)
+                                }
+                                _ => self.layout_helper(child_ix, geometry, fullscreen_apps)
+                            }
+                        }
+                        _ => self.layout_helper(child_ix, geometry, fullscreen_apps)
+                    }
                 }
                 // place floating children above everything else
                 let root_ix = self.tree.children_of(node_ix)[0];
@@ -110,6 +122,15 @@ impl LayoutTree {
                 }
             },
             ContainerType::Container => {
+                {
+                    let container_mut = self.tree.get_mut(node_ix).unwrap();
+                    match *container_mut {
+                        Container::Container { geometry: ref mut c_geometry, .. } => {
+                            *c_geometry = geometry;
+                        },
+                        _ => unreachable!()
+                    };
+                }
                 let layout = match self.tree[node_ix] {
                     Container::Container { layout, .. } => layout,
                     _ => unreachable!()
@@ -127,14 +148,8 @@ impl LayoutTree {
                         if total_width > 0.1 {
 
                             // Updated geometry with enough width to hold all children
-                            let new_geometry = Geometry {
-                                origin: self.tree[node_ix].get_geometry()
-                                    .expect("Container had no geometry").origin.clone(),
-                                size: Size {
-                                    w: total_width as u32,
-                                    h: geometry.size.h
-                                }
-                            };
+                            let mut new_geometry = geometry.clone();
+                            new_geometry.size.w = total_width as u32;
                             self.tree[node_ix].set_geometry(ResizeEdge::empty(), new_geometry);
 
                             let new_size_f = |child_size: Size, sub_geometry: Geometry| {
@@ -177,15 +192,6 @@ impl LayoutTree {
                         }
                     }
                     Layout::Horizontal => {
-                        {
-                            let container_mut = self.tree.get_mut(node_ix).unwrap();
-                            match *container_mut {
-                                Container::Container { geometry: ref mut c_geometry, .. } => {
-                                    *c_geometry = geometry;
-                                },
-                                _ => unreachable!()
-                            };
-                        }
                         let children = self.tree.grounded_children(node_ix);
                         let children_len = children.len();
                         let mut scale = LayoutTree::calculate_scale(children.iter().map(|child_ix| {
@@ -236,15 +242,6 @@ impl LayoutTree {
                         }
                     }
                     Layout::Vertical => {
-                        {
-                            let container_mut = self.tree.get_mut(node_ix).unwrap();
-                            match *container_mut {
-                                Container::Container { geometry: ref mut c_geometry, .. } => {
-                                    *c_geometry = geometry;
-                                },
-                                _ => unreachable!()
-                            };
-                        }
                         let children = self.tree.grounded_children(node_ix);
                         let children_len = children.len();
                         let mut scale = LayoutTree::calculate_scale(children.iter().map(|child_ix| {
@@ -359,17 +356,11 @@ impl LayoutTree {
                 if x < 0 {
                     new_geometry.origin.x = geometry_p.origin.x - x + overlap;
                     let mut fullscreen_apps = Vec::new();
-                    {
-                        self.tree[parent_ix].set_geometry(ResizeEdge::empty(), new_geometry);
-                    }
                     self.layout_helper(parent_ix, new_geometry, &mut fullscreen_apps);
                 // x >= 0 so as u32 is safe
                 } else if x as u32 + geometry_c.size.w > resolution.w {
                     new_geometry.origin.x = geometry_p.origin.x - x - overlap
                         + (resolution.w as i32 - geometry_c.size.w as i32);
-                    {
-                        self.tree[parent_ix].set_geometry(ResizeEdge::empty(), new_geometry);
-                    }
                     let mut fullscreen_apps = Vec::new();
                     self.layout_helper(parent_ix, new_geometry, &mut fullscreen_apps);
                 }
